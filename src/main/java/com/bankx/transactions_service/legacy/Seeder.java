@@ -23,7 +23,7 @@ public class Seeder implements CommandLineRunner {
 	// Bloqueante (JPA) 
 	riskRepo.save(RiskRule.builder()
 						  .currency("PEN")
-						  .maxDebitPerTx(new BigDecimal("1500")).build()); 
+						  .maxDebitPerTx(new BigDecimal("1500")).build()); // por default estaba en 1500 se aumenta para test de fondo insuficiente
 	riskRepo.save(RiskRule.builder()
 						  .currency("USD")
 						  .maxDebitPerTx(new BigDecimal("500")).build()); 
