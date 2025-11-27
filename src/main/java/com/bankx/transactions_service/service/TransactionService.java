@@ -1,4 +1,4 @@
-package com.bankx.transactions_service.config;
+package com.bankx.transactions_service.service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
