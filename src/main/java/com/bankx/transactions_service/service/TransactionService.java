@@ -1,38 +1,48 @@
 package com.bankx.transactions_service.service;
 
-import java.math.BigDecimal;
-import java.time.Instant;
-
-import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.stereotype.Service;
-
 import com.bankx.transactions_service.api.dto.CreateTxRequest;
 import com.bankx.transactions_service.domain.Account;
 import com.bankx.transactions_service.domain.Transaction;
 import com.bankx.transactions_service.error.BusinessException;
 import com.bankx.transactions_service.legacy.RiskService;
+import com.bankx.transactions_service.logging.LogContext;
 import com.bankx.transactions_service.repo.AccountRepository;
 import com.bankx.transactions_service.repo.TransactionRepository;
-
 import lombok.RequiredArgsConstructor;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 
+import java.math.BigDecimal;
+import java.time.Instant;
+
 @Service @RequiredArgsConstructor
 public class TransactionService {
+
+    private static final Logger log = LogManager.getLogger(TransactionService.class);
 	
 	private final AccountRepository accountRepo; 
 	private final TransactionRepository txRepo; 
 	private final RiskService riskService; 
 	private final Sinks.Many<Transaction> txSink;
+    private final LogContext logContext;
 	
 	public Mono<Transaction> create(CreateTxRequest req) {
-	    return accountRepo.findByNumber(req.getAccountNumber()) 
-				.switchIfEmpty(Mono.error(new BusinessException("account_not_found"))) 
-				.flatMap(acc -> validateAndApply(acc, req)) 
-				.onErrorMap(IllegalStateException.class, e -> new BusinessException(e.getMessage()));
+        log.debug("Creating tx {}", req);
+
+        return logContext.withMdc(
+                accountRepo.findByNumber(req.getAccountNumber())
+                        .switchIfEmpty(Mono.error(new BusinessException("account_not_found")))
+                        .flatMap(acc -> validateAndApply(acc, req))
+                        .onErrorMap(IllegalStateException.class, e -> new BusinessException(e.getMessage()))
+        ).doOnSuccess(tx -> log.info("tx_created account={} amount={}",
+                                        req.getAccountNumber(),
+                                        req.getAmount()));
 	}
 	
 	private Mono<Transaction> validateAndApply(Account acc, CreateTxRequest req) {
@@ -70,14 +80,16 @@ public class TransactionService {
 	      }); 
 	  } 
 	 
-	public Flux<Transaction> byAccount(String accountNumber) { 
+	public Flux<Transaction> byAccount(String accountNumber) {
+        log.debug("Get account {}", accountNumber);
 	    return accountRepo.findByNumber(accountNumber)
-				.switchIfEmpty(Mono.error(new BusinessException("account_not_found"))) 
-				.flatMapMany(acc -> 
-					txRepo.findByAccountIdOrderByTimestampDesc(acc.getId())); 
+				.switchIfEmpty(Mono.error(new BusinessException("account_not_found")))
+				.flatMapMany(acc ->
+					txRepo.findByAccountIdOrderByTimestampDesc(acc.getId()));
 	}
 	
-	public Flux<ServerSentEvent<Transaction>> stream() { 
+	public Flux<ServerSentEvent<Transaction>> stream() {
+        log.debug("Init stream");
 	    return txSink.asFlux().map(tx -> ServerSentEvent.builder(tx).event("transaction").build()); 
 	}
 

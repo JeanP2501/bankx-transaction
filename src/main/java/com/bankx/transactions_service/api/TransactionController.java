@@ -34,12 +34,12 @@ public class TransactionController {
  
   @GetMapping("/transactions") 
   public Flux<Transaction> list(@RequestParam String accountNumber) {
-	  return service.byAccount(accountNumber); 
+      return service.byAccount(accountNumber);
   } 
  
   @GetMapping(value = "/stream/transactions", produces = MediaType.TEXT_EVENT_STREAM_VALUE) 
   public Flux<ServerSentEvent<Transaction>> stream() {
-	  return service.stream();
+      return service.stream();
   }
 
 }
